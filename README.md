@@ -108,7 +108,7 @@ Next to the [Update Server](hawkbit-runtime/hawkbit-update-server) we are also p
 ```bash
 git clone https://github.com/eclipse/hawkbit.git
 cd hawkbit
-mvn clean install
+mvn clean install -Dmaven.test.skip=true -e -X
 java -jar ./hawkbit-runtime/hawkbit-update-server/target/hawkbit-update-server-#version#.jar
 ```
 
