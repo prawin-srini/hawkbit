@@ -1,10 +1,10 @@
 # set Java
-ARG JAVA_VERSION=17.0.9_9
+ARG JAVA_VERSION=17.0.10_7
 # extracts spring layers from the app jar (to optimize boot)
 FROM eclipse-temurin:${JAVA_VERSION}-jre-alpine as build
 
 ARG HAWKBIT_APP=hawkbit-update-server
-ARG HAWKBIT_VERSION=0.3.0
+ARG HAWKBIT_VERSION=pass_as_buils_arg
 
 ENV BUILD_DIR=/opt/hawkbit_build
 ENV APP=${HAWKBIT_APP}
@@ -14,7 +14,8 @@ COPY KEY .
 
 RUN set -x &&\
  apk add --no-cache --virtual build-dependencies gnupg unzip libressl wget &&\
- gpg --import KEY &&\
+ rm -f $GNUPGHOME/trustdb.gpg.lock &&\
+ export GNUPGHOME=$(mktemp -d) && gpg --no-use-standard-socket --lock-never --import KEY-mysql &&\
  mkdir -p ${BUILD_DIR} &&\
  cd ${BUILD_DIR} &&\
  wget -O ${APP}.jar --no-verbose https://repo1.maven.org/maven2/org/eclipse/hawkbit/${APP}/${VERSION}/${APP}-${VERSION}.jar &&\
@@ -41,4 +42,4 @@ ENV JAVA_OPTS="-Xms768m -Xmx768m -XX:MaxMetaspaceSize=250m -XX:MetaspaceSize=250
 
 VOLUME "/artifactrepo"
 EXPOSE ${CONTAINER_PORT}
-ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} org.springframework.boot.loader.JarLauncher ${@}"]
+ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} org.springframework.boot.loader.launch.JarLauncher ${@}"]

@@ -1,19 +1,23 @@
 # set Java
-ARG JAVA_VERSION=17.0.9_9
+ARG JAVA_VERSION=17
 # extracts spring layers from the app jar (to optimize boot)
-FROM eclipse-temurin:${JAVA_VERSION}-jre-alpine as build
+FROM eclipse-temurin:${JAVA_VERSION}-jre as build
 
 ARG HAWKBIT_APP=hawkbit-update-server
-ARG HAWKBIT_VERSION=0.3.0
+ARG HAWKBIT_VERSION=pass_as_buils_arg
+
 
 ENV BUILD_DIR=/opt/hawkbit_build
 ENV APP=${HAWKBIT_APP}
 ENV VERSION=${HAWKBIT_VERSION}
+ARG MARIADB_DRIVER_VERSION=3.1.4
+ENV MARIADB_DRIVER_VERSION=${MARIADB_DRIVER_VERSION}
 
 COPY KEY .
 
 RUN set -x &&\
- apk add --no-cache --virtual build-dependencies gnupg unzip libressl wget &&\
+ apt-get update &&\
+ apt-get install -y --no-install-recommends gnupg unzip wget &&\
  gpg --import KEY &&\
  mkdir -p ${BUILD_DIR} &&\
  cd ${BUILD_DIR} &&\
@@ -23,31 +27,37 @@ RUN set -x &&\
  java -Djarmode=layertools -jar ${APP}.jar extract --destination . &&\
  rm ${APP}.jar ${APP}.jar.asc /KEY
 
-ARG MARIADB_DRIVER_VERSION=3.1.4
 COPY KEY-mysql .
 
 RUN set -x &&\
  gpg --import KEY-mysql &&\
- wget -O ${BUILD_DIR}/mariadb-java-client-${MARIADB_DRIVER_VERSION}.jar --no-verbose https://downloads.mariadb.com/Connectors/java/connector-java-${MARIADB_DRIVER_VERSION}/mariadb-java-client-${MARIADB_DRIVER_VERSION}.jar &&\
- wget -O ${BUILD_DIR}/mariadb-java-client-${MARIADB_DRIVER_VERSION}.jar.asc --no-verbose https://downloads.mariadb.com/Connectors/java/connector-java-${MARIADB_DRIVER_VERSION}/mariadb-java-client-${MARIADB_DRIVER_VERSION}.jar.asc &&\
+ wget -O ${BUILD_DIR}/mariadb-java-client-${MARIADB_DRIVER_VERSION}.jar --no-verbose https://downloads.mariadb.com/Connectors/java/connector-java-3.1.4/mariadb-java-client-3.1.4.jar &&\
+ wget -O ${BUILD_DIR}/mariadb-java-client-${MARIADB_DRIVER_VERSION}.jar.asc --no-verbose https://downloads.mariadb.com/Connectors/java/connector-java-3.1.4/mariadb-java-client-3.1.4.jar.asc &&\
  gpg --verify --batch ${BUILD_DIR}/mariadb-java-client-${MARIADB_DRIVER_VERSION}.jar.asc ${BUILD_DIR}/mariadb-java-client-${MARIADB_DRIVER_VERSION}.jar &&\
- apk del build-dependencies &&\
+ apt-get remove -y gnupg unzip wget &&\
+ apt-get autoremove -y &&\
+ rm -rf /var/lib/apt/lists/* &&\
+ ls -la ${BUILD_DIR}/ &&\
  rm ${BUILD_DIR}/mariadb-java-client-${MARIADB_DRIVER_VERSION}.jar.asc /KEY-mysql
 
-FROM eclipse-temurin:${JAVA_VERSION}-jre-alpine
 
-RUN addgroup -S hawkbit_group && adduser -D hawkbit -G hawkbit_group
+FROM eclipse-temurin:${JAVA_VERSION}-jre
+RUN groupadd hawkbit_group && useradd -ms /bin/bash -g hawkbit_group hawkbit
 RUN mkdir -p /artifactrepo && chown -R hawkbit /artifactrepo
 USER hawkbit
 
 ENV BUILD_DIR=/opt/hawkbit_build
 COPY --from=build ${BUILD_DIR}/dependencies/ ./
+RUN true
 COPY --from=build ${BUILD_DIR}/spring-boot-loader/ ./
+RUN true
 COPY --from=build ${BUILD_DIR}/snapshot-dependencies/ ./
+RUN true
 COPY --from=build ${BUILD_DIR}/application/ ./
+RUN true
 ARG MARIADB_DRIVER_VERSION=3.1.4
 COPY --from=build ${BUILD_DIR}/mariadb-java-client-${MARIADB_DRIVER_VERSION}.jar ./BOOT-INF/lib/
-
+RUN true
 ARG CONTAINER_PORT=8080
 ENV JAVA_OPTS="-Dspring.profiles.active=mysql -Xms768m -Xmx768m -XX:MaxMetaspaceSize=250m -XX:MetaspaceSize=250m -Xss300K -XX:+UseG1GC -XX:+UseStringDeduplication -XX:+UseCompressedOops -XX:+HeapDumpOnOutOfMemoryError"
 

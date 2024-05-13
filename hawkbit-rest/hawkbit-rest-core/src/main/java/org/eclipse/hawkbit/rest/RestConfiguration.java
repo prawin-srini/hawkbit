@@ -26,6 +26,7 @@ import org.springframework.hateoas.config.EnableHypermediaSupport.HypermediaType
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.context.WebApplicationContext;
+import org.eclipse.hawkbit.rest.util.ContentLengthFilter;
 
 /**
  * Configuration for Rest api.
@@ -88,5 +89,15 @@ public class RestConfiguration {
                 "/api/v1/downloadserver/**"));
 
         return filterRegBean;
+    }
+    /*
+     * The Content-Length filter is used to set the Content-Length header in the HTTP Response
+     */
+    @Bean
+    public FilterRegistrationBean<ContentLengthFilter> contentLengthFilter() {
+        FilterRegistrationBean<ContentLengthFilter> registrationBean = new FilterRegistrationBean<>();
+        registrationBean.setFilter(new ContentLengthFilter());
+        registrationBean.addUrlPatterns("/*"); // Apply filter to all URLs
+        return registrationBean;
     }
 }
